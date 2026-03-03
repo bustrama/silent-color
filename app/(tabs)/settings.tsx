@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -35,6 +36,7 @@ export default function SettingsScreen() {
     clearCities,
     setSoundSetting,
     setCustomSound,
+    setExactCityMatch,
   } = usePreferencesContext();
 
   const [search, setSearch] = useState('');
@@ -143,6 +145,29 @@ export default function SettingsScreen() {
                 />
               </View>
             </View>
+
+            {/* Filter settings — exact match toggle */}
+            {!search && (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>הגדרות סינון</Text>
+                <View style={styles.exactMatchRow}>
+                  <Switch
+                    value={prefs.exactCityMatch ?? false}
+                    onValueChange={setExactCityMatch}
+                    trackColor={{ false: colors.border, true: `${colors.primaryDark}80` }}
+                    thumbColor={prefs.exactCityMatch ? colors.primaryDark : colors.textMuted}
+                  />
+                  <View style={styles.exactMatchTexts}>
+                    <Text style={styles.exactMatchTitle}>התאמה מדויקת</Text>
+                    <Text style={styles.exactMatchDesc}>
+                      {prefs.exactCityMatch
+                        ? 'מציג רק התרעות שהישוב שלהם תואם בדיוק'
+                        : 'מציג גם התרעות עם שמות דומים'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
 
             {/* Sound settings */}
             {!search && (
@@ -443,6 +468,35 @@ function makeStyles(c: AppColors) {
       fontSize: 12,
       color: c.textMuted,
       fontWeight: '500',
+    },
+    // Exact match toggle
+    exactMatchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: c.surfaceLight,
+      borderRadius: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 12,
+    },
+    exactMatchTexts: {
+      flex: 1,
+      alignItems: 'flex-end',
+      gap: 3,
+    },
+    exactMatchTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: c.textMain,
+      textAlign: 'right',
+    },
+    exactMatchDesc: {
+      fontSize: 11,
+      color: c.textMuted,
+      textAlign: 'right',
     },
     loader: { marginVertical: 20 },
     emptyText: {

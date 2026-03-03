@@ -68,6 +68,14 @@ export function usePreferences() {
     });
   }, []);
 
+  const setExactCityMatch = useCallback((exact: boolean) => {
+    setPrefs(prev => {
+      const updated: UserPreferences = { ...prev, exactCityMatch: exact };
+      savePreferences(updated);
+      return updated;
+    });
+  }, []);
+
   return {
     prefs,
     loading,
@@ -76,5 +84,6 @@ export function usePreferences() {
     clearCities,
     setSoundSetting,
     setCustomSound,
+    setExactCityMatch,
   };
 }

@@ -16,7 +16,7 @@ const LiveAlertContext = createContext<LiveAlertContextValue | null>(null);
  */
 export function LiveAlertProvider({ children }: { children: React.ReactNode }) {
   const { prefs } = usePreferencesContext();
-  const value = useLiveAlerts(prefs.selectedCities, prefs.soundSetting);
+  const value = useLiveAlerts(prefs.selectedCities, prefs.soundSetting, prefs.exactCityMatch ?? false);
 
   return (
     <LiveAlertContext.Provider value={value}>

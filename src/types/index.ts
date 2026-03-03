@@ -30,4 +30,6 @@ export interface UserPreferences {
   soundSetting: SoundSetting;
   customSoundUri?: string;
   customSoundName?: string;
+  /** When true, only show alerts whose city exactly matches a selected city */
+  exactCityMatch?: boolean;
 }

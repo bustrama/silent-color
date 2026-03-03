@@ -12,12 +12,14 @@ const POLL_INTERVAL_MS = 1000;
 
 export function useLiveAlerts(
   selectedCities: string[],
-  soundSetting: SoundSetting
+  soundSetting: SoundSetting,
+  exactCityMatch: boolean,
 ) {
   const [currentAlert, setCurrentAlert] = useState<OrefAlert | null>(null);
   const [matchedCities, setMatchedCities] = useState<string[]>([]);
   const soundSettingRef = useRef(soundSetting);
   const selectedCitiesRef = useRef(selectedCities);
+  const exactCityMatchRef = useRef(exactCityMatch);
 
   // Keep refs in sync so interval closure has latest values
   useEffect(() => {
@@ -27,6 +29,10 @@ export function useLiveAlerts(
   useEffect(() => {
     selectedCitiesRef.current = selectedCities;
   }, [selectedCities]);
+
+  useEffect(() => {
+    exactCityMatchRef.current = exactCityMatch;
+  }, [exactCityMatch]);
 
   // Pre-seed the deduplication set from storage to prevent re-firing
   // the last alert after a cold start (foreground/background sync)
@@ -53,9 +59,10 @@ export function useLiveAlerts(
       setCurrentAlert(alert);
 
       const cities = selectedCitiesRef.current;
+      const exact = exactCityMatchRef.current;
       const matched =
         cities.length > 0
-          ? alert.data.filter((c) => matchesSingleCity(c, cities))
+          ? alert.data.filter((c) => matchesSingleCity(c, cities, exact))
           : alert.data;
       setMatchedCities(matched);
 

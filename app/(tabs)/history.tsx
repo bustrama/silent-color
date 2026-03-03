@@ -46,7 +46,9 @@ export default function HistoryScreen() {
     let items = baseItems;
 
     if (prefs.selectedCities.length > 0) {
-      items = items.filter((item) => matchesCityFilter(item.data, prefs.selectedCities));
+      items = items.filter((item) =>
+        matchesCityFilter(item.data, prefs.selectedCities, prefs.exactCityMatch ?? false)
+      );
     }
 
     if (search.trim()) {

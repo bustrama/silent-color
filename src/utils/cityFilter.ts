@@ -17,12 +17,20 @@ export function normalizeName(s: string): string {
 /**
  * Returns true when a single city name from a live alert matches any of the
  * selected cities (with normalization).
+ *
+ * @param exactMatch  When true only accept an exact (normalized) match.
+ *                    When false also accept substring/partial matches.
  */
-export function matchesSingleCity(city: string, selectedCities: string[]): boolean {
+export function matchesSingleCity(
+  city: string,
+  selectedCities: string[],
+  exactMatch = false,
+): boolean {
   if (selectedCities.length === 0) return true;
   const cn = normalizeName(city);
   return selectedCities.some((sel) => {
     const sn = normalizeName(sel);
+    if (exactMatch) return cn === sn;
     return cn === sn || cn.includes(sn) || sn.includes(cn);
   });
 }
@@ -33,8 +41,16 @@ export function matchesSingleCity(city: string, selectedCities: string[]): boole
  *
  * `itemData` may be a single city name or a comma-separated list; we split and
  * check each segment individually.
+ *
+ * @param exactMatch  When true each segment must exactly equal a selected city
+ *                    (after normalization). When false partial/substring matches
+ *                    are also accepted.
  */
-export function matchesCityFilter(itemData: string, selectedCities: string[]): boolean {
+export function matchesCityFilter(
+  itemData: string,
+  selectedCities: string[],
+  exactMatch = false,
+): boolean {
   if (selectedCities.length === 0) return true;
 
   // Split comma-separated city list and normalize each segment
@@ -45,8 +61,10 @@ export function matchesCityFilter(itemData: string, selectedCities: string[]): b
 
   return selectedCities.some((selected) => {
     const sel = normalizeName(selected);
-    // Accept if any segment in the item equals OR contains the selected city
-    // (bidirectional — handles partial name substrings in either direction)
+    if (exactMatch) {
+      return itemCities.some((ic) => ic === sel);
+    }
+    // Bidirectional substring — handles partial name overlaps in either direction
     return itemCities.some((ic) => ic === sel || ic.includes(sel) || sel.includes(ic));
   });
 }

@@ -33,9 +33,9 @@ export default function HomeScreen() {
   const filteredHistory = useMemo(() => {
     if (prefs.selectedCities.length === 0) return displayedItems;
     return allItems.filter((item) =>
-      matchesCityFilter(item.data, prefs.selectedCities)
+      matchesCityFilter(item.data, prefs.selectedCities, prefs.exactCityMatch ?? false)
     );
-  }, [allItems, displayedItems, prefs.selectedCities]);
+  }, [allItems, displayedItems, prefs.selectedCities, prefs.exactCityMatch]);
 
   const previewItems = filteredHistory.slice(0, 3);
 
