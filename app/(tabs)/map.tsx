@@ -6,18 +6,32 @@ import { useLiveAlertContext } from '../../src/context/LiveAlertContext';
 import { useAlertHistoryContext } from '../../src/context/AlertHistoryContext';
 import { getCityCoords } from '../../src/data/cityCoordinates';
 import { getAlertIcon } from '../../src/utils/alertIcon';
+import { getAlertColors } from '../../src/utils/alertColors';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
+import type { HistoryAlert } from '../../src/types';
 
 interface MapMarker {
   city: string;
   lat: number;
   lon: number;
+  color: string;      // stroke / border
+  fillColor: string;  // fill
+  label: string;      // popup subtitle: "title · relative time"
 }
 
-function buildRecentMarkers(
-  allItems: { alertDate: string; data: string }[]
-): MapMarker[] {
+function formatRelativeTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (diffMin < 1) return 'עכשיו';
+  if (diffMin < 60) return `לפני ${diffMin} דק'`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `לפני ${diffHr} שע'`;
+  return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
+}
+
+function buildRecentMarkers(allItems: HistoryAlert[]): MapMarker[] {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000; // last 24 hours
   const seen = new Set<string>();
   const result: MapMarker[] = [];
@@ -26,6 +40,9 @@ function buildRecentMarkers(
     const d = new Date(item.alertDate);
     if (isNaN(d.getTime()) || d.getTime() < cutoff) break; // history is newest-first
 
+    const { primary } = getAlertColors(item.title, item.category);
+    const label = `${item.title} · ${formatRelativeTime(item.alertDate)}`;
+
     // data may be a single city or comma-separated list
     const cities = item.data.split(',').map((s) => s.trim()).filter(Boolean);
     for (const cityName of cities) {
@@ -33,7 +50,14 @@ function buildRecentMarkers(
       const coords = getCityCoords(cityName);
       if (!coords) continue;
       seen.add(cityName);
-      result.push({ city: cityName, lat: coords.lat, lon: coords.lon });
+      result.push({
+        city: cityName,
+        lat: coords.lat,
+        lon: coords.lon,
+        color: primary,
+        fillColor: primary,
+        label,
+      });
     }
     if (result.length >= 150) break; // cap at 150 unique markers
   }
@@ -72,6 +96,7 @@ function buildMapHTML(
       50%  { transform: scale(1.7); opacity: 0.45; }
       100% { transform: scale(1);   opacity: 1; }
     }
+    .leaflet-popup-content { direction: rtl; text-align: right; }
     .leaflet-control-attribution {
       background: ${isDark ? 'rgba(15,23,42,0.75)' : 'rgba(255,255,255,0.75)'} !important;
       color: ${isDark ? '#94a3b8' : '#64748b'} !important;
@@ -100,16 +125,19 @@ function buildMapHTML(
 
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-  // Recent history markers (dim, static — last 24h)
+  // Recent history markers — colored by alert type
   var recentData = ${recentJson};
   recentData.forEach(function(m) {
     L.circleMarker([m.lat, m.lon], {
       radius: 7,
-      color: '${isDark ? '#475569' : '#94a3b8'}',
-      fillColor: '${isDark ? '#334155' : '#cbd5e1'}',
-      fillOpacity: 0.6,
-      weight: 1.5
-    }).addTo(map).bindPopup('<b>' + m.city + '</b><br><small>24 שעות אחרונות</small>');
+      color: m.color,
+      fillColor: m.fillColor,
+      fillOpacity: 0.55,
+      weight: 2
+    }).addTo(map).bindPopup(
+      '<b>' + m.city + '</b>' +
+      (m.label ? '<br><small style="opacity:0.75">' + m.label + '</small>' : '')
+    );
   });
 
   // Live alert markers (pulsing, updatable via postMessage)
@@ -124,12 +152,15 @@ function buildMapHTML(
     data.forEach(function(m) {
       var circle = L.circleMarker([m.lat, m.lon], {
         radius: 16,
-        color: '#f97316',
-        fillColor: '#fb923c',
-        fillOpacity: 0.8,
+        color: m.color,
+        fillColor: m.fillColor,
+        fillOpacity: 0.85,
         weight: 2.5,
         className: 'alert-pulse'
-      }).addTo(map).bindPopup('<b>' + m.city + '</b>');
+      }).addTo(map).bindPopup(
+        '<b>' + m.city + '</b>' +
+        (m.label ? '<br><small style="opacity:0.75">' + m.label + '</small>' : '')
+      );
       liveMarkers.push(circle);
       bounds.push([m.lat, m.lon]);
     });
@@ -169,17 +200,25 @@ export default function MapScreen() {
     [allItems]
   );
 
-  const liveMarkers = useMemo(
-    () =>
-      alertCities
-        .map((city) => {
-          const coords = getCityCoords(city);
-          if (!coords) return null;
-          return { city, lat: coords.lat, lon: coords.lon };
-        })
-        .filter(Boolean) as MapMarker[],
-    [alertCities]
-  );
+  const liveMarkers = useMemo(() => {
+    const { primary } = currentAlert
+      ? getAlertColors(currentAlert.title, parseInt(currentAlert.cat) || undefined)
+      : { primary: '#ef4444' };
+    return alertCities
+      .map((city) => {
+        const coords = getCityCoords(city);
+        if (!coords) return null;
+        return {
+          city,
+          lat: coords.lat,
+          lon: coords.lon,
+          color: primary,
+          fillColor: primary,
+          label: currentAlert?.title ?? '',
+        };
+      })
+      .filter(Boolean) as MapMarker[];
+  }, [alertCities, currentAlert]);
 
   const updateLiveMarkers = useCallback(() => {
     webviewRef.current?.postMessage(

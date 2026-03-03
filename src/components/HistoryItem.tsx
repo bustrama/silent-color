@@ -12,6 +12,9 @@ import { useTheme } from '../hooks/useTheme';
 import type { AppColors } from '../hooks/useTheme';
 import type { HistoryAlert } from '../types';
 import { getAlertIcon } from '../utils/alertIcon';
+import { getAlertColors } from '../utils/alertColors';
+import { matchesSingleCity } from '../utils/cityFilter';
+import { usePreferencesContext } from '../context/PreferencesContext';
 
 interface Props {
   item: HistoryAlert;
@@ -64,27 +67,46 @@ export function HistoryItem({ item }: Props) {
   const fullDateTime = getFullDateTime(item.alertDate);
   const recent = isRecent(item.alertDate);
   const alertIcon = getAlertIcon(item.title, item.category);
+  const { primary, soft } = getAlertColors(item.title, item.category);
+  const { prefs } = usePreferencesContext();
+  const selectedCities = prefs.selectedCities;
+  const exactMatch = prefs.exactCityMatch ?? false;
 
   const cities = item.data.split(',').map(s => s.trim()).filter(Boolean);
+
+  const isMatchedCity = (city: string) =>
+    selectedCities.length > 0 &&
+    matchesSingleCity(city, selectedCities, exactMatch);
 
   return (
     <>
       <View style={styles.container}>
         {/* Icon + city info */}
         <View style={styles.row}>
-          <View style={[styles.iconWrap, recent ? styles.iconWrapActive : styles.iconWrapMuted]}>
+          <View style={[styles.iconWrap, { backgroundColor: recent ? soft : `${soft}88` }]}>
             <Text style={styles.iconText}>{alertIcon}</Text>
           </View>
           <View style={styles.info}>
             <Text style={styles.cityName} numberOfLines={1}>
-              {item.data}
+              {selectedCities.length > 0
+                ? cities.map((city, i) => (
+                    <Text
+                      key={i}
+                      style={isMatchedCity(city)
+                        ? { color: primary, fontWeight: '800' }
+                        : undefined}
+                    >
+                      {i > 0 ? ', ' : ''}{city}
+                    </Text>
+                  ))
+                : item.data}
             </Text>
             <Text style={styles.title} numberOfLines={1}>
               {item.title}
             </Text>
           </View>
-          <View style={[styles.timeBadge, recent ? styles.timeBadgeActive : styles.timeBadgeMuted]}>
-            <Text style={[styles.timeBadgeText, recent ? styles.timeBadgeTextActive : styles.timeBadgeTextMuted]}>
+          <View style={[styles.timeBadge, recent ? { backgroundColor: soft } : styles.timeBadgeMuted]}>
+            <Text style={[styles.timeBadgeText, recent ? { color: primary } : styles.timeBadgeTextMuted]}>
               {relTime}
             </Text>
           </View>
@@ -139,11 +161,22 @@ export function HistoryItem({ item }: Props) {
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled
               >
-                {cities.map((city, i) => (
-                  <View key={i} style={styles.cityChip}>
-                    <Text style={styles.cityChipText}>{city}</Text>
-                  </View>
-                ))}
+                {cities.map((city, i) => {
+                  const matched = isMatchedCity(city);
+                  return (
+                    <View
+                      key={i}
+                      style={[
+                        styles.cityChip,
+                        matched && { backgroundColor: soft, borderColor: `${primary}60` },
+                      ]}
+                    >
+                      <Text style={[styles.cityChipText, matched && { color: primary }]}>
+                        {city}
+                      </Text>
+                    </View>
+                  );
+                })}
               </ScrollView>
             </View>
 
