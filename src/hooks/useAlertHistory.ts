@@ -8,6 +8,7 @@ const PAGE_SIZE = 20;
 export function useAlertHistory() {
   const allItemsRef = useRef<HistoryAlert[]>([]);
   const pageRef = useRef(1);
+  const [allItems, setAllItems] = useState<HistoryAlert[]>([]);
   const [displayedItems, setDisplayedItems] = useState<HistoryAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -25,6 +26,7 @@ export function useAlertHistory() {
       const history = await fetchAlertHistory();
       if (!active) return;
       allItemsRef.current = history;
+      setAllItems(history);
       // Preserve the current scroll page — don't reset on background poll
       applyPage(history, pageRef.current);
       setLoading(false);
@@ -44,5 +46,5 @@ export function useAlertHistory() {
     applyPage(allItemsRef.current, nextPage);
   }, []);
 
-  return { displayedItems, loading, hasMore, loadMore };
+  return { allItems, displayedItems, loading, hasMore, loadMore };
 }

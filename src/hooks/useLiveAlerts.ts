@@ -6,6 +6,7 @@ import {
 } from '../services/notificationService';
 import { saveLastAlertId, getLastAlertId } from '../services/storageService';
 import type { OrefAlert, SoundSetting } from '../types';
+import { matchesSingleCity } from '../utils/cityFilter';
 
 const POLL_INTERVAL_MS = 1000;
 
@@ -54,7 +55,7 @@ export function useLiveAlerts(
       const cities = selectedCitiesRef.current;
       const matched =
         cities.length > 0
-          ? alert.data.filter((c) => cities.includes(c))
+          ? alert.data.filter((c) => matchesSingleCity(c, cities))
           : alert.data;
       setMatchedCities(matched);
 

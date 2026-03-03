@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Modal,
-  Animated,
-  Pressable,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useLiveAlertContext } from '../../src/context/LiveAlertContext';
 import { useAlertHistoryContext } from '../../src/context/AlertHistoryContext';
@@ -18,51 +15,27 @@ import { HistoryItem } from '../../src/components/HistoryItem';
 import { usePreferencesContext } from '../../src/context/PreferencesContext';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
-
-const APP_VERSION = '1.0.0';
-const DRAWER_WIDTH = 280;
+import { matchesCityFilter } from '../../src/utils/cityFilter';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { currentAlert, matchedCities } = useLiveAlertContext();
-  const { displayedItems, loading } = useAlertHistoryContext();
+  const { allItems, displayedItems, loading } = useAlertHistoryContext();
   const { prefs } = usePreferencesContext();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const slideAnim = useRef(new Animated.Value(DRAWER_WIDTH)).current;
-
-  const openDrawer = useCallback(() => {
-    setDrawerOpen(true);
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 280,
-      useNativeDriver: true,
-    }).start();
-  }, [slideAnim]);
-
-  const closeDrawer = useCallback(() => {
-    Animated.timing(slideAnim, {
-      toValue: DRAWER_WIDTH,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => setDrawerOpen(false));
-  }, [slideAnim]);
 
   const showAlert = currentAlert !== null && matchedCities.length > 0;
   const alertCities = showAlert ? matchedCities : [];
 
-  // Filter history by selected cities (empty = show all)
+  // Filter history by selected cities (empty = show all).
+  // When filter is active use allItems so the preview searches the full dataset.
   const filteredHistory = useMemo(() => {
     if (prefs.selectedCities.length === 0) return displayedItems;
-    return displayedItems.filter((item) =>
-      prefs.selectedCities.some((city) =>
-        item.data.toLowerCase().includes(city.toLowerCase())
-      )
+    return allItems.filter((item) =>
+      matchesCityFilter(item.data, prefs.selectedCities)
     );
-  }, [displayedItems, prefs.selectedCities]);
+  }, [allItems, displayedItems, prefs.selectedCities]);
 
   const previewItems = filteredHistory.slice(0, 3);
 
@@ -70,13 +43,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={openDrawer} hitSlop={12}>
-          <Text style={styles.menuIcon}>☰</Text>
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>צבע שקט</Text>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/settings')}>
-          <Text style={styles.settingsLink}>הגדרות</Text>
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -133,7 +100,11 @@ export default function HomeScreen() {
               <HistoryItem key={`${item.alertDate}-${i}`} item={item} />
             ))}
             {previewItems.length === 0 && (
-              <Text style={styles.emptyText}>אין היסטוריה זמינה</Text>
+              <Text style={styles.emptyText}>
+                {prefs.selectedCities.length > 0
+                  ? 'אין היסטוריה עבור הישובים הנבחרים'
+                  : 'אין היסטוריה זמינה'}
+              </Text>
             )}
           </View>
         )}
@@ -158,73 +129,6 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
       </ScrollView>
-
-      {/* Hamburger slide-in drawer */}
-      <Modal
-        visible={drawerOpen}
-        transparent
-        animationType="none"
-        onRequestClose={closeDrawer}
-      >
-        <Pressable style={styles.drawerBackdrop} onPress={closeDrawer}>
-          <Pressable onPress={() => {}}>
-            <Animated.View
-              style={[
-                styles.drawerPanel,
-                { paddingTop: insets.top + 8 },
-                { transform: [{ translateX: slideAnim }] },
-              ]}
-            >
-              {/* Close */}
-              <TouchableOpacity style={styles.drawerClose} onPress={closeDrawer}>
-                <Text style={styles.drawerCloseIcon}>✕</Text>
-              </TouchableOpacity>
-
-              {/* App identity */}
-              <View style={styles.drawerAppSection}>
-                <Text style={styles.drawerAppIcon}>🛡️</Text>
-                <Text style={styles.drawerAppName}>צבע שקט</Text>
-                <Text style={styles.drawerAppVersion}>גרסה {APP_VERSION}</Text>
-              </View>
-
-              <View style={styles.drawerDivider} />
-
-              {/* Navigation */}
-              <Text style={styles.drawerSectionLabel}>ניווט</Text>
-              {([
-                { icon: '🏠', label: 'ראשי', route: '/(tabs)/index' },
-                { icon: '🗺️', label: 'מפה', route: '/(tabs)/map' },
-                { icon: '🕐', label: 'היסטוריה', route: '/(tabs)/history' },
-                { icon: '⚙️', label: 'הגדרות', route: '/(tabs)/settings' },
-              ] as const).map((item) => (
-                <TouchableOpacity
-                  key={item.route}
-                  style={styles.drawerNavItem}
-                  onPress={() => { closeDrawer(); router.push(item.route); }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.drawerNavIcon}>{item.icon}</Text>
-                  <Text style={styles.drawerNavLabel}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-
-              <View style={styles.drawerDivider} />
-
-              {/* About */}
-              <Text style={styles.drawerSectionLabel}>אודות</Text>
-              <Text style={styles.drawerAboutText}>
-                אפליקציה לניטור התרעות פיקוד העורף בזמן אמת. מבוסס על ממשק ה-API הרשמי של פיקוד העורף.
-              </Text>
-
-              <View style={styles.drawerFooter}>
-                <Text style={styles.drawerFooterText}>
-                  {isDark ? '🌙 מצב לילה' : '☀️ מצב יום'}
-                </Text>
-              </View>
-            </Animated.View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -233,18 +137,14 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: c.bgLight },
     header: {
-      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 12,
       backgroundColor: c.bgLight,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.border,
     },
-    menuIcon: { fontSize: 22, color: c.textMuted },
     headerTitle: { fontSize: 20, fontWeight: 'bold', color: c.textMain },
-    settingsLink: { fontSize: 14, fontWeight: '600', color: c.primaryDark },
     scroll: { flex: 1 },
     scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
     updatedText: {
@@ -380,62 +280,5 @@ function makeStyles(c: AppColors) {
     },
     realtimeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: c.calmTeal },
     realtimeText: { color: '#fff', fontSize: 11, fontWeight: '500' },
-    // Drawer
-    drawerBackdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-    },
-    drawerPanel: {
-      width: DRAWER_WIDTH,
-      height: '100%',
-      backgroundColor: c.bgLight,
-      paddingHorizontal: 20,
-      paddingBottom: 40,
-      shadowColor: '#000',
-      shadowOffset: { width: -4, height: 0 },
-      shadowOpacity: 0.25,
-      shadowRadius: 16,
-      elevation: 20,
-    },
-    drawerClose: { alignSelf: 'flex-end', padding: 8, marginBottom: 4 },
-    drawerCloseIcon: { fontSize: 18, color: c.textMuted },
-    drawerAppSection: { alignItems: 'flex-end', paddingVertical: 12 },
-    drawerAppIcon: { fontSize: 40, marginBottom: 8 },
-    drawerAppName: { fontSize: 22, fontWeight: '800', color: c.textMain },
-    drawerAppVersion: { fontSize: 12, color: c.textMuted, marginTop: 2 },
-    drawerDivider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: c.border,
-      marginVertical: 16,
-    },
-    drawerSectionLabel: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: c.textMuted,
-      textAlign: 'right',
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
-      marginBottom: 8,
-    },
-    drawerNavItem: {
-      flexDirection: 'row-reverse',
-      alignItems: 'center',
-      gap: 14,
-      paddingVertical: 12,
-      paddingHorizontal: 4,
-      borderRadius: 10,
-    },
-    drawerNavIcon: { fontSize: 20, width: 28, textAlign: 'center' },
-    drawerNavLabel: { fontSize: 16, fontWeight: '600', color: c.textMain },
-    drawerAboutText: {
-      fontSize: 13,
-      color: c.textMuted,
-      textAlign: 'right',
-      lineHeight: 20,
-    },
-    drawerFooter: { position: 'absolute', bottom: 40, right: 20 },
-    drawerFooterText: { fontSize: 12, color: c.textMuted },
   });
 }

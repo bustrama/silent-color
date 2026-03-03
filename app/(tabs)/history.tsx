@@ -14,6 +14,7 @@ import { HistoryItem } from '../../src/components/HistoryItem';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
 import type { HistoryAlert } from '../../src/types';
+import { matchesCityFilter } from '../../src/utils/cityFilter';
 
 type Section = { type: 'header'; label: string } | { type: 'item'; item: HistoryAlert };
 
@@ -29,29 +30,35 @@ function getDateLabel(dateStr: string): string {
 }
 
 export default function HistoryScreen() {
-  const { displayedItems, loading, hasMore, loadMore } = useAlertHistoryContext();
+  const { allItems, displayedItems, loading, hasMore, loadMore } = useAlertHistoryContext();
   const { prefs } = usePreferencesContext();
   const [search, setSearch] = useState('');
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  // Filter by selected cities first (empty selection = show all)
-  const cityFiltered = useMemo(() => {
-    if (prefs.selectedCities.length === 0) return displayedItems;
-    return displayedItems.filter((item) =>
-      prefs.selectedCities.some((city) =>
-        item.data.toLowerCase().includes(city.toLowerCase())
-      )
-    );
-  }, [displayedItems, prefs.selectedCities]);
+  const filterActive = prefs.selectedCities.length > 0 || search.trim().length > 0;
+
+  // When a filter is active, search the FULL dataset so no results are missed.
+  // When no filter, use the paginated displayedItems to keep scrolling smooth.
+  const baseItems = filterActive ? allItems : displayedItems;
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return cityFiltered;
-    const q = search.trim().toLowerCase();
-    return cityFiltered.filter((item) =>
-      item.data.toLowerCase().includes(q) || item.title.toLowerCase().includes(q)
-    );
-  }, [cityFiltered, search]);
+    let items = baseItems;
+
+    if (prefs.selectedCities.length > 0) {
+      items = items.filter((item) => matchesCityFilter(item.data, prefs.selectedCities));
+    }
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      items = items.filter(
+        (item) => item.data.toLowerCase().includes(q) || item.title.toLowerCase().includes(q)
+      );
+    }
+
+    return items;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseItems, prefs.selectedCities, search]);
 
   // Build date-grouped sections
   const sections = useMemo((): Section[] => {
@@ -127,7 +134,8 @@ export default function HistoryScreen() {
             }
             return <HistoryItem item={s.item} />;
           }}
-          onEndReached={hasMore ? loadMore : undefined}
+          // Pagination only makes sense in unfiltered mode
+          onEndReached={!filterActive && hasMore ? loadMore : undefined}
           onEndReachedThreshold={0.3}
           ListEmptyComponent={
             <Text style={styles.emptyText}>
@@ -136,8 +144,9 @@ export default function HistoryScreen() {
                 : 'אין היסטוריה זמינה'}
             </Text>
           }
+          // Footer spinner only when unfiltered and more pages exist
           ListFooterComponent={
-            hasMore ? (
+            !filterActive && hasMore ? (
               <ActivityIndicator color={colors.primaryDark} style={styles.footerLoader} />
             ) : null
           }

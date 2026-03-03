@@ -3,6 +3,9 @@ import { useAlertHistory } from '../hooks/useAlertHistory';
 import type { HistoryAlert } from '../types';
 
 interface AlertHistoryContextValue {
+  /** Full dataset — use this when a filter is active to search all history */
+  allItems: HistoryAlert[];
+  /** Current paginated slice — use this for the unfiltered scrollable list */
   displayedItems: HistoryAlert[];
   loading: boolean;
   hasMore: boolean;
