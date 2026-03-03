@@ -5,10 +5,11 @@ import type { SoundSetting, UserPreferences } from '../types';
 interface PreferencesContextValue {
   prefs: UserPreferences;
   loading: boolean;
-  toggleCity: (city: string) => Promise<void>;
-  selectAllCities: (cities: string[]) => Promise<void>;
-  clearCities: () => Promise<void>;
-  setSoundSetting: (setting: SoundSetting) => Promise<void>;
+  toggleCity: (city: string) => void;
+  selectAllCities: (cities: string[]) => void;
+  clearCities: () => void;
+  setSoundSetting: (setting: SoundSetting) => void;
+  setCustomSound: (uri: string | null, name: string | null) => void;
 }
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);

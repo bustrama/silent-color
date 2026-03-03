@@ -28,4 +28,6 @@ export type SoundSetting = 'sound' | 'vibrate' | 'silent';
 export interface UserPreferences {
   selectedCities: string[];
   soundSetting: SoundSetting;
+  customSoundUri?: string;
+  customSoundName?: string;
 }

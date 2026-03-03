@@ -68,7 +68,10 @@ export async function scheduleAlertNotification(
 
 let audioPlayer: AudioPlayer | null = null;
 
-export async function playAlertSound(setting: SoundSetting): Promise<void> {
+export async function playAlertSound(
+  setting: SoundSetting,
+  customSoundUri?: string
+): Promise<void> {
   if (setting === 'silent') return;
 
   if (setting === 'vibrate') {
@@ -84,7 +87,11 @@ export async function playAlertSound(setting: SoundSetting): Promise<void> {
       audioPlayer = null;
     }
 
-    audioPlayer = createAudioPlayer(require('../../assets/sounds/alert.wav'));
+    const source = customSoundUri
+      ? { uri: customSoundUri }
+      : require('../../assets/sounds/alert.wav');
+
+    audioPlayer = createAudioPlayer(source);
     audioPlayer.play();
 
     // Also vibrate alongside sound

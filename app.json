@@ -23,7 +23,9 @@
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -42,6 +44,12 @@
       "expo-audio",
       "expo-background-task"
     ],
-    "scheme": "redalert"
+    "scheme": "redalert",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "043f21ba-6f50-4502-95c4-a732a2d2d5c6"
+      }
+    }
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,17 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as DocumentPicker from 'expo-document-picker';
 import { useCities } from '../../src/hooks/useCities';
 import { usePreferencesContext } from '../../src/context/PreferencesContext';
 import { CityRow } from '../../src/components/CityRow';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
 import type { SoundSetting } from '../../src/types';
+import { playAlertSound } from '../../src/services/notificationService';
 
 const SOUND_OPTIONS: { label: string; value: SoundSetting; icon: string }[] = [
   { label: 'צליל התראה', value: 'sound', icon: '🔔' },
@@ -31,6 +34,7 @@ export default function SettingsScreen() {
     selectAllCities,
     clearCities,
     setSoundSetting,
+    setCustomSound,
   } = usePreferencesContext();
 
   const [search, setSearch] = useState('');
@@ -50,9 +54,34 @@ export default function SettingsScreen() {
   const selectedCount = prefs.selectedCities.length;
   const allLabels = cities.map((c) => c.label);
 
+  const handleTestSound = useCallback(async () => {
+    await playAlertSound('sound', prefs.customSoundUri);
+  }, [prefs.customSoundUri]);
+
+  const handlePickSound = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'audio/*',
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        const { uri, name } = result.assets[0];
+        setCustomSound(uri, name ?? 'צליל מותאם');
+      }
+    } catch {
+      Alert.alert('שגיאה', 'לא ניתן לפתוח את בוחר הקבצים');
+    }
+  }, [setCustomSound]);
+
+  const handleResetSound = useCallback(() => {
+    setCustomSound(null, null);
+  }, [setCustomSound]);
+
+  const soundFileName = prefs.customSoundName ?? 'alert.wav (ברירת מחדל)';
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Header — no save button (prefs auto-save on every toggle) */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
         <Text style={styles.headerTitle}>בחירת אזורי ניטור</Text>
@@ -143,6 +172,45 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                {/* Expanded sound controls — only when sound mode is selected */}
+                {prefs.soundSetting === 'sound' && (
+                  <View style={styles.soundExpanded}>
+                    {/* Current sound name */}
+                    <View style={styles.soundFileRow}>
+                      <Text style={styles.soundFileIcon}>🎵</Text>
+                      <Text style={styles.soundFileName} numberOfLines={1}>
+                        {soundFileName}
+                      </Text>
+                      {prefs.customSoundUri && (
+                        <TouchableOpacity onPress={handleResetSound} style={styles.soundResetBtn}>
+                          <Text style={styles.soundResetText}>איפוס</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {/* Action buttons */}
+                    <View style={styles.soundActionRow}>
+                      <TouchableOpacity
+                        style={styles.soundActionBtn}
+                        onPress={handleTestSound}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.soundActionIcon}>🔊</Text>
+                        <Text style={styles.soundActionLabel}>בדוק צליל</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.soundActionBtn, styles.soundActionBtnPrimary]}
+                        onPress={handlePickSound}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.soundActionIcon}>📁</Text>
+                        <Text style={[styles.soundActionLabel, styles.soundActionLabelPrimary]}>
+                          בחר מהמכשיר
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
 
@@ -292,6 +360,68 @@ function makeStyles(c: AppColors) {
       textAlign: 'center',
     },
     soundChipLabelActive: { color: c.primaryDark, fontWeight: '700' },
+    // Expanded sound controls
+    soundExpanded: {
+      marginTop: 12,
+      backgroundColor: c.surfaceLight,
+      borderRadius: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      overflow: 'hidden',
+    },
+    soundFileRow: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
+    soundFileIcon: { fontSize: 14 },
+    soundFileName: {
+      flex: 1,
+      fontSize: 13,
+      color: c.textMain,
+      textAlign: 'right',
+      fontWeight: '500',
+    },
+    soundResetBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 8,
+      backgroundColor: `${c.alertOrange}15`,
+    },
+    soundResetText: {
+      fontSize: 11,
+      color: c.alertOrangeDark,
+      fontWeight: '600',
+    },
+    soundActionRow: {
+      flexDirection: 'row-reverse',
+      gap: 0,
+    },
+    soundActionBtn: {
+      flex: 1,
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      borderRightWidth: StyleSheet.hairlineWidth,
+      borderRightColor: c.border,
+    },
+    soundActionBtnPrimary: {
+      backgroundColor: `${c.primaryDark}10`,
+      borderRightWidth: 0,
+    },
+    soundActionIcon: { fontSize: 16 },
+    soundActionLabel: {
+      fontSize: 13,
+      color: c.textMuted,
+      fontWeight: '600',
+    },
+    soundActionLabelPrimary: { color: c.primaryDark },
     cityListHeader: {
       flexDirection: 'row',
       alignItems: 'center',

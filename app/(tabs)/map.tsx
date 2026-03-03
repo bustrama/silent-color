@@ -3,21 +3,53 @@ import { View, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useLiveAlertContext } from '../../src/context/LiveAlertContext';
+import { useAlertHistoryContext } from '../../src/context/AlertHistoryContext';
 import { getCityCoords } from '../../src/data/cityCoordinates';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
 
-function buildMapHTML(alertCities: string[], isDark: boolean): string {
-  const markers = alertCities
-    .map((city) => {
-      const coords = getCityCoords(city);
-      if (!coords) return null;
-      return { city, lat: coords.lat, lon: coords.lon };
-    })
-    .filter(Boolean);
+interface MapMarker {
+  city: string;
+  lat: number;
+  lon: number;
+}
 
-  const markersJson = JSON.stringify(markers);
-  const mapBg = isDark ? '#1e293b' : '#e8f4f8';
+function buildRecentMarkers(
+  displayedItems: { alertDate: string; data: string }[]
+): MapMarker[] {
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000; // last 24 hours
+  const seen = new Set<string>();
+  const result: MapMarker[] = [];
+
+  for (const item of displayedItems.slice(0, 30)) {
+    const d = new Date(item.alertDate);
+    if (isNaN(d.getTime()) || d.getTime() < cutoff) continue;
+    const cityName = item.data.trim();
+    if (!cityName || seen.has(cityName)) continue;
+    const coords = getCityCoords(cityName);
+    if (!coords) continue;
+    seen.add(cityName);
+    result.push({ city: cityName, lat: coords.lat, lon: coords.lon });
+    if (result.length >= 20) break;
+  }
+  return result;
+}
+
+function buildMapHTML(
+  alertMarkers: MapMarker[],
+  recentMarkers: MapMarker[],
+  isDark: boolean
+): string {
+  const alertJson = JSON.stringify(alertMarkers);
+  const recentJson = JSON.stringify(recentMarkers);
+
+  // CartoDB Dark Matter for proper dark mode — no CSS invert tricks
+  const tileUrl = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const tileAttrib = isDark
+    ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
   return `<!DOCTYPE html>
 <html>
@@ -27,14 +59,26 @@ function buildMapHTML(alertCities: string[], isDark: boolean): string {
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body, #map { height: 100%; width: 100%; background: ${mapBg}; }
+    html, body, #map { height: 100%; width: 100%; }
+    body { background: ${isDark ? '#0f172a' : '#e8f4f8'}; }
     .alert-pulse { animation: pulse 1.2s ease-in-out infinite; }
     @keyframes pulse {
-      0%   { transform: scale(1);   opacity: 1;   }
-      50%  { transform: scale(1.6); opacity: 0.5; }
-      100% { transform: scale(1);   opacity: 1;   }
+      0%   { transform: scale(1);   opacity: 1; }
+      50%  { transform: scale(1.7); opacity: 0.45; }
+      100% { transform: scale(1);   opacity: 1; }
     }
-    ${isDark ? `.leaflet-tile { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }` : ''}
+    .leaflet-control-attribution {
+      background: ${isDark ? 'rgba(15,23,42,0.75)' : 'rgba(255,255,255,0.75)'} !important;
+      color: ${isDark ? '#94a3b8' : '#64748b'} !important;
+      font-size: 9px;
+    }
+    .leaflet-control-attribution a { color: ${isDark ? '#7dd3fc' : '#0284c7'} !important; }
+    .leaflet-bar a {
+      background: ${isDark ? '#1e293b' : '#fff'} !important;
+      color: ${isDark ? '#e2e8f0' : '#374151'} !important;
+      border-color: ${isDark ? '#334155' : '#ccc'} !important;
+    }
+    .leaflet-bar a:hover { background: ${isDark ? '#334155' : '#f0f0f0'} !important; }
   </style>
 </head>
 <body>
@@ -42,54 +86,65 @@ function buildMapHTML(alertCities: string[], isDark: boolean): string {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   var map = L.map('map', { zoomControl: false }).setView([31.5, 35.0], 7);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap',
-    maxZoom: 18
+
+  L.tileLayer('${tileUrl}', {
+    attribution: '${tileAttrib}',
+    maxZoom: 19,
+    subdomains: 'abcd'
   }).addTo(map);
 
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-  var alertMarkers = [];
-  var markers = ${markersJson};
+  // Recent history markers (dim, static — last 24h)
+  var recentData = ${recentJson};
+  recentData.forEach(function(m) {
+    L.circleMarker([m.lat, m.lon], {
+      radius: 7,
+      color: '${isDark ? '#475569' : '#94a3b8'}',
+      fillColor: '${isDark ? '#334155' : '#cbd5e1'}',
+      fillOpacity: 0.6,
+      weight: 1.5
+    }).addTo(map).bindPopup('<b>' + m.city + '</b><br><small>24 שעות אחרונות</small>');
+  });
 
-  function refreshMarkers() {
-    alertMarkers.forEach(function(m) { map.removeLayer(m); });
-    alertMarkers = [];
-    if (markers.length === 0) return;
+  // Live alert markers (pulsing, updatable via postMessage)
+  var liveMarkers = [];
+  var liveData = ${alertJson};
+
+  function refreshLive(data) {
+    liveMarkers.forEach(function(m) { map.removeLayer(m); });
+    liveMarkers = [];
+    if (data.length === 0) return;
     var bounds = [];
-    markers.forEach(function(m) {
+    data.forEach(function(m) {
       var circle = L.circleMarker([m.lat, m.lon], {
-        radius: 14,
+        radius: 16,
         color: '#f97316',
         fillColor: '#fb923c',
-        fillOpacity: 0.75,
-        weight: 2,
+        fillOpacity: 0.8,
+        weight: 2.5,
         className: 'alert-pulse'
-      }).addTo(map).bindPopup(m.city);
-      alertMarkers.push(circle);
+      }).addTo(map).bindPopup('<b>' + m.city + '</b>');
+      liveMarkers.push(circle);
       bounds.push([m.lat, m.lon]);
     });
     if (bounds.length === 1) {
       map.setView(bounds[0], 11);
     } else if (bounds.length > 1) {
-      map.fitBounds(bounds, { padding: [40, 40] });
+      map.fitBounds(bounds, { padding: [50, 50] });
     }
   }
 
-  refreshMarkers();
+  refreshLive(liveData);
 
-  window.addEventListener('message', function(e) {
+  function onMessage(e) {
     try {
       var data = JSON.parse(e.data);
-      if (data.type === 'UPDATE_MARKERS') { markers = data.markers; refreshMarkers(); }
+      if (data.type === 'UPDATE_MARKERS') { refreshLive(data.markers); }
     } catch(err) {}
-  });
-  document.addEventListener('message', function(e) {
-    try {
-      var data = JSON.parse(e.data);
-      if (data.type === 'UPDATE_MARKERS') { markers = data.markers; refreshMarkers(); }
-    } catch(err) {}
-  });
+  }
+  window.addEventListener('message', onMessage);
+  document.addEventListener('message', onMessage);
 </script>
 </body>
 </html>`;
@@ -98,31 +153,45 @@ function buildMapHTML(alertCities: string[], isDark: boolean): string {
 export default function MapScreen() {
   const webviewRef = useRef<WebView>(null);
   const { currentAlert, matchedCities } = useLiveAlertContext();
+  const { displayedItems } = useAlertHistoryContext();
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  // matchedCities is [] when no alert, or the relevant city list when alert is active
   const alertCities = matchedCities;
 
-  const updateMap = useCallback(() => {
-    const markers = alertCities
-      .map((city) => {
-        const coords = getCityCoords(city);
-        if (!coords) return null;
-        return { city, lat: coords.lat, lon: coords.lon };
-      })
-      .filter(Boolean);
+  const recentMarkers = useMemo(
+    () => buildRecentMarkers(displayedItems),
+    [displayedItems]
+  );
 
+  const liveMarkers = useMemo(
+    () =>
+      alertCities
+        .map((city) => {
+          const coords = getCityCoords(city);
+          if (!coords) return null;
+          return { city, lat: coords.lat, lon: coords.lon };
+        })
+        .filter(Boolean) as MapMarker[],
+    [alertCities]
+  );
+
+  const updateLiveMarkers = useCallback(() => {
     webviewRef.current?.postMessage(
-      JSON.stringify({ type: 'UPDATE_MARKERS', markers })
+      JSON.stringify({ type: 'UPDATE_MARKERS', markers: liveMarkers })
     );
-  }, [alertCities]);
+  }, [liveMarkers]);
 
   useEffect(() => {
-    updateMap();
-  }, [updateMap]);
+    updateLiveMarkers();
+  }, [updateLiveMarkers]);
 
-  const initialHtml = buildMapHTML(alertCities, isDark);
+  const initialHtml = useMemo(
+    () => buildMapHTML(liveMarkers, recentMarkers, isDark),
+    // Rebuild full HTML only when dark mode or recent markers change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isDark, recentMarkers]
+  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -146,6 +215,11 @@ export default function MapScreen() {
         <View style={styles.calmBar}>
           <View style={styles.calmDot} />
           <Text style={styles.calmBarText}>הכל רגוע</Text>
+          {recentMarkers.length > 0 && (
+            <Text style={styles.calmBarSub}>
+              · {recentMarkers.length} אזורים ב-24 שע'
+            </Text>
+          )}
         </View>
       )}
 
@@ -154,7 +228,7 @@ export default function MapScreen() {
         ref={webviewRef}
         source={{ html: initialHtml }}
         style={styles.webview}
-        onLoad={updateMap}
+        onLoad={updateLiveMarkers}
         javaScriptEnabled
         domStorageEnabled
         originWhitelist={['*']}
@@ -224,6 +298,10 @@ function makeStyles(c: AppColors) {
       color: c.calmTealDark,
       fontSize: 13,
       fontWeight: '600',
+    },
+    calmBarSub: {
+      color: c.textMuted,
+      fontSize: 11,
     },
     webview: { flex: 1 },
   });

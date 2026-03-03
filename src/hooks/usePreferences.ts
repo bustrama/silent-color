@@ -56,6 +56,18 @@ export function usePreferences() {
     });
   }, []);
 
+  const setCustomSound = useCallback((uri: string | null, name: string | null) => {
+    setPrefs(prev => {
+      const updated: UserPreferences = {
+        ...prev,
+        customSoundUri: uri ?? undefined,
+        customSoundName: name ?? undefined,
+      };
+      savePreferences(updated);
+      return updated;
+    });
+  }, []);
+
   return {
     prefs,
     loading,
@@ -63,5 +75,6 @@ export function usePreferences() {
     selectAllCities,
     clearCities,
     setSoundSetting,
+    setCustomSound,
   };
 }
