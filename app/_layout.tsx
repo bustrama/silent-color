@@ -10,6 +10,7 @@ import { registerBackgroundFetch } from '../src/tasks/backgroundFetch';
 import { PreferencesProvider } from '../src/context/PreferencesContext';
 import { LiveAlertProvider } from '../src/context/LiveAlertContext';
 import { AlertHistoryProvider } from '../src/context/AlertHistoryContext';
+import { OnboardingModal } from '../src/components/OnboardingModal';
 
 export default function RootLayout() {
   const isDark = useColorScheme() === 'dark';
@@ -43,6 +44,7 @@ export default function RootLayout() {
           <AlertHistoryProvider>
             <StatusBar style={isDark ? 'light' : 'dark'} />
             <Stack screenOptions={{ headerShown: false }} />
+            <OnboardingModal />
           </AlertHistoryProvider>
         </LiveAlertProvider>
       </PreferencesProvider>

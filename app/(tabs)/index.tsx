@@ -81,6 +81,12 @@ export default function HomeScreen() {
   const liveAlertIcon = currentAlert
     ? getAlertIcon(currentAlert.title, parseInt(currentAlert.cat) || undefined)
     : '⚠️';
+  const liveAlertColors = useMemo(
+    () => currentAlert
+      ? getAlertColors(currentAlert.title, parseInt(currentAlert.cat) || undefined)
+      : { primary: colors.alertOrangeDark, soft: `${colors.alertOrange}18` },
+    [currentAlert, colors],
+  );
 
   // Filter history by selected cities (empty = show all).
   // When filter is active use allItems so the preview searches the full dataset.
@@ -153,7 +159,10 @@ export default function HomeScreen() {
 
         {/* Hero card */}
         {showAlert && currentAlert ? (
-          <View style={styles.alertHero}>
+          <View style={[styles.alertHero, {
+            backgroundColor: liveAlertColors.primary,
+            shadowColor: liveAlertColors.primary,
+          }]}>
             <View style={styles.heroIconWrap}>
               <Text style={styles.heroIcon}>{liveAlertIcon}</Text>
             </View>

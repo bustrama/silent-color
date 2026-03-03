@@ -32,4 +32,6 @@ export interface UserPreferences {
   customSoundName?: string;
   /** When true, only show alerts whose city exactly matches a selected city */
   exactCityMatch?: boolean;
+  /** True once the user has completed or dismissed the first-run onboarding */
+  onboardingDone?: boolean;
 }

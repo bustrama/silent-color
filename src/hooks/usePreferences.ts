@@ -76,6 +76,14 @@ export function usePreferences() {
     });
   }, []);
 
+  const setOnboardingDone = useCallback(() => {
+    setPrefs(prev => {
+      const updated: UserPreferences = { ...prev, onboardingDone: true };
+      savePreferences(updated);
+      return updated;
+    });
+  }, []);
+
   return {
     prefs,
     loading,
@@ -85,5 +93,6 @@ export function usePreferences() {
     setSoundSetting,
     setCustomSound,
     setExactCityMatch,
+    setOnboardingDone,
   };
 }

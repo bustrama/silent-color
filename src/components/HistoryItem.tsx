@@ -93,7 +93,7 @@ export function HistoryItem({ item }: Props) {
                     <Text
                       key={i}
                       style={isMatchedCity(city)
-                        ? { color: primary, fontWeight: '800' }
+                        ? { color: colors.primaryDark, fontWeight: '800' }
                         : undefined}
                     >
                       {i > 0 ? ', ' : ''}{city}
@@ -168,10 +168,10 @@ export function HistoryItem({ item }: Props) {
                       key={i}
                       style={[
                         styles.cityChip,
-                        matched && { backgroundColor: soft, borderColor: `${primary}60` },
+                        matched && { backgroundColor: `${colors.primaryDark}18`, borderColor: `${colors.primaryDark}50` },
                       ]}
                     >
-                      <Text style={[styles.cityChipText, matched && { color: primary }]}>
+                      <Text style={[styles.cityChipText, matched && { color: colors.primaryDark }]}>
                         {city}
                       </Text>
                     </View>

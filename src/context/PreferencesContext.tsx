@@ -11,6 +11,7 @@ interface PreferencesContextValue {
   setSoundSetting: (setting: SoundSetting) => void;
   setCustomSound: (uri: string | null, name: string | null) => void;
   setExactCityMatch: (exact: boolean) => void;
+  setOnboardingDone: () => void;
 }
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
