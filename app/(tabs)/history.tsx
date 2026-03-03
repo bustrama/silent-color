@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAlertHistoryContext } from '../../src/context/AlertHistoryContext';
+import { usePreferencesContext } from '../../src/context/PreferencesContext';
 import { HistoryItem } from '../../src/components/HistoryItem';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
@@ -29,17 +30,28 @@ function getDateLabel(dateStr: string): string {
 
 export default function HistoryScreen() {
   const { displayedItems, loading, hasMore, loadMore } = useAlertHistoryContext();
+  const { prefs } = usePreferencesContext();
   const [search, setSearch] = useState('');
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return displayedItems;
-    const q = search.trim().toLowerCase();
+  // Filter by selected cities first (empty selection = show all)
+  const cityFiltered = useMemo(() => {
+    if (prefs.selectedCities.length === 0) return displayedItems;
     return displayedItems.filter((item) =>
+      prefs.selectedCities.some((city) =>
+        item.data.toLowerCase().includes(city.toLowerCase())
+      )
+    );
+  }, [displayedItems, prefs.selectedCities]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return cityFiltered;
+    const q = search.trim().toLowerCase();
+    return cityFiltered.filter((item) =>
       item.data.toLowerCase().includes(q) || item.title.toLowerCase().includes(q)
     );
-  }, [displayedItems, search]);
+  }, [cityFiltered, search]);
 
   // Build date-grouped sections
   const sections = useMemo((): Section[] => {
@@ -62,6 +74,15 @@ export default function HistoryScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>היסטוריית התראות</Text>
       </View>
+
+      {/* City filter indicator */}
+      {prefs.selectedCities.length > 0 && (
+        <View style={styles.filterBanner}>
+          <Text style={styles.filterText}>
+            🎯 מסונן: {prefs.selectedCities.length} ישובים נבחרים
+          </Text>
+        </View>
+      )}
 
       {/* Search + pulse */}
       <View style={styles.searchWrap}>
@@ -109,7 +130,11 @@ export default function HistoryScreen() {
           onEndReached={hasMore ? loadMore : undefined}
           onEndReachedThreshold={0.3}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>אין היסטוריה זמינה</Text>
+            <Text style={styles.emptyText}>
+              {prefs.selectedCities.length > 0
+                ? 'אין היסטוריה עבור הישובים הנבחרים'
+                : 'אין היסטוריה זמינה'}
+            </Text>
           }
           ListFooterComponent={
             hasMore ? (
@@ -202,6 +227,21 @@ function makeStyles(c: AppColors) {
       color: c.textMuted,
       backgroundColor: c.bgLight,
       paddingHorizontal: 8,
+    },
+    filterBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: `${c.primaryDark}12`,
+      paddingVertical: 6,
+      paddingHorizontal: 16,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: `${c.primaryDark}20`,
+    },
+    filterText: {
+      fontSize: 12,
+      color: c.primaryDark,
+      fontWeight: '600',
     },
     loader: { marginTop: 40 },
     footerLoader: { paddingVertical: 16 },

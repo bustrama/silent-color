@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { useLiveAlertContext } from '../../src/context/LiveAlertContext';
 import { useAlertHistoryContext } from '../../src/context/AlertHistoryContext';
 import { HistoryItem } from '../../src/components/HistoryItem';
+import { usePreferencesContext } from '../../src/context/PreferencesContext';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
 
@@ -26,6 +27,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { currentAlert, matchedCities } = useLiveAlertContext();
   const { displayedItems, loading } = useAlertHistoryContext();
+  const { prefs } = usePreferencesContext();
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -51,7 +53,18 @@ export default function HomeScreen() {
 
   const showAlert = currentAlert !== null && matchedCities.length > 0;
   const alertCities = showAlert ? matchedCities : [];
-  const previewItems = displayedItems.slice(0, 3);
+
+  // Filter history by selected cities (empty = show all)
+  const filteredHistory = useMemo(() => {
+    if (prefs.selectedCities.length === 0) return displayedItems;
+    return displayedItems.filter((item) =>
+      prefs.selectedCities.some((city) =>
+        item.data.toLowerCase().includes(city.toLowerCase())
+      )
+    );
+  }, [displayedItems, prefs.selectedCities]);
+
+  const previewItems = filteredHistory.slice(0, 3);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
