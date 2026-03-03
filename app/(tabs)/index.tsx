@@ -16,6 +16,7 @@ import { usePreferencesContext } from '../../src/context/PreferencesContext';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
 import { matchesCityFilter } from '../../src/utils/cityFilter';
+import { getAlertIcon } from '../../src/utils/alertIcon';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -27,6 +28,9 @@ export default function HomeScreen() {
 
   const showAlert = currentAlert !== null && matchedCities.length > 0;
   const alertCities = showAlert ? matchedCities : [];
+  const liveAlertIcon = currentAlert
+    ? getAlertIcon(currentAlert.title, parseInt(currentAlert.cat) || undefined)
+    : '⚠️';
 
   // Filter history by selected cities (empty = show all).
   // When filter is active use allItems so the preview searches the full dataset.
@@ -57,7 +61,7 @@ export default function HomeScreen() {
         {showAlert && currentAlert ? (
           <View style={styles.alertHero}>
             <View style={styles.heroIconWrap}>
-              <Text style={styles.heroIcon}>⚠️</Text>
+              <Text style={styles.heroIcon}>{liveAlertIcon}</Text>
             </View>
             <Text style={styles.heroTitle}>{currentAlert.title}</Text>
             <Text style={styles.heroSubtitle}>{currentAlert.desc}</Text>

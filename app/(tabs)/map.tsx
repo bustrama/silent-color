@@ -5,6 +5,7 @@ import { WebView } from 'react-native-webview';
 import { useLiveAlertContext } from '../../src/context/LiveAlertContext';
 import { useAlertHistoryContext } from '../../src/context/AlertHistoryContext';
 import { getCityCoords } from '../../src/data/cityCoordinates';
+import { getAlertIcon } from '../../src/utils/alertIcon';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
 
@@ -211,7 +212,8 @@ export default function MapScreen() {
       {currentAlert ? (
         <View style={styles.alertBar}>
           <Text style={styles.alertBarText}>
-            🔴 {currentAlert.title} — {alertCities.slice(0, 3).join(', ')}
+            {getAlertIcon(currentAlert.title, parseInt(currentAlert.cat) || undefined)}{' '}
+            {currentAlert.title} — {alertCities.slice(0, 3).join(', ')}
             {alertCities.length > 3 ? ` +${alertCities.length - 3}` : ''}
           </Text>
         </View>

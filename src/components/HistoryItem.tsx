@@ -11,6 +11,7 @@ import {
 import { useTheme } from '../hooks/useTheme';
 import type { AppColors } from '../hooks/useTheme';
 import type { HistoryAlert } from '../types';
+import { getAlertIcon } from '../utils/alertIcon';
 
 interface Props {
   item: HistoryAlert;
@@ -53,18 +54,6 @@ function isRecent(dateStr: string): boolean {
   return Date.now() - d.getTime() < 60 * 60 * 1000;
 }
 
-const CATEGORY_ICONS: Record<number, string> = {
-  1: '🚀',
-  2: '✈️',
-  3: '🌍',
-  4: '💣',
-  5: '☣️',
-  6: '🔫',
-  7: '🔫',
-  13: '☢️',
-  20: '🔔',
-};
-
 export function HistoryItem({ item }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -74,7 +63,7 @@ export function HistoryItem({ item }: Props) {
   const absTime = getAbsoluteTime(item.alertDate);
   const fullDateTime = getFullDateTime(item.alertDate);
   const recent = isRecent(item.alertDate);
-  const categoryIcon = CATEGORY_ICONS[item.category] ?? '⚠️';
+  const alertIcon = getAlertIcon(item.title, item.category);
 
   const cities = item.data.split(',').map(s => s.trim()).filter(Boolean);
 
@@ -84,7 +73,7 @@ export function HistoryItem({ item }: Props) {
         {/* Icon + city info */}
         <View style={styles.row}>
           <View style={[styles.iconWrap, recent ? styles.iconWrapActive : styles.iconWrapMuted]}>
-            <Text style={styles.iconText}>{recent ? '🔔' : '📍'}</Text>
+            <Text style={styles.iconText}>{alertIcon}</Text>
           </View>
           <View style={styles.info}>
             <Text style={styles.cityName} numberOfLines={1}>
@@ -123,7 +112,7 @@ export function HistoryItem({ item }: Props) {
 
             {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalCategoryIcon}>{categoryIcon}</Text>
+              <Text style={styles.modalCategoryIcon}>{alertIcon}</Text>
               <Text style={styles.modalTitle}>{item.title}</Text>
             </View>
 
