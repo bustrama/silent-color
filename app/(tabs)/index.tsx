@@ -15,8 +15,19 @@ import { HistoryItem } from '../../src/components/HistoryItem';
 import { usePreferencesContext } from '../../src/context/PreferencesContext';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
-import { matchesCityFilter } from '../../src/utils/cityFilter';
+import { matchesCityFilter, matchesSingleCity } from '../../src/utils/cityFilter';
 import { getAlertIcon } from '../../src/utils/alertIcon';
+
+function formatRelativeTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (diffMin < 1) return 'עכשיו';
+  if (diffMin < 60) return `לפני ${diffMin} דק'`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `לפני ${diffHr} שע'`;
+  return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -42,6 +53,23 @@ export default function HomeScreen() {
   }, [allItems, displayedItems, prefs.selectedCities, prefs.exactCityMatch]);
 
   const previewItems = filteredHistory.slice(0, 3);
+
+  // Last event for the hero card when no live alert is active
+  const lastEvent = filteredHistory[0] ?? null;
+  const lastEventIcon = lastEvent
+    ? getAlertIcon(lastEvent.title, lastEvent.category)
+    : null;
+  const lastEventTime = lastEvent ? formatRelativeTime(lastEvent.alertDate) : '';
+  const lastEventCities = useMemo(() => {
+    if (!lastEvent) return [];
+    const all = lastEvent.data.split(',').map((s) => s.trim()).filter(Boolean);
+    if (prefs.selectedCities.length > 0) {
+      return all.filter((city) =>
+        matchesSingleCity(city, prefs.selectedCities, prefs.exactCityMatch ?? false)
+      );
+    }
+    return all.slice(0, 5);
+  }, [lastEvent, prefs.selectedCities, prefs.exactCityMatch]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -78,7 +106,32 @@ export default function HomeScreen() {
               )}
             </View>
           </View>
+        ) : lastEvent ? (
+          /* Last-event hero — calm style, shows most recent alert matching filter */
+          <View style={styles.calmHero}>
+            <View style={styles.heroIconWrapCalm}>
+              <Text style={styles.heroIconCalm}>{lastEventIcon}</Text>
+            </View>
+            <Text style={styles.lastEventLabel}>האירוע האחרון</Text>
+            <Text style={styles.calmTitle}>{lastEvent.title}</Text>
+            <Text style={styles.calmSubtitle}>{lastEventTime}</Text>
+            {lastEventCities.length > 0 && (
+              <View style={styles.citiesWrap}>
+                {lastEventCities.slice(0, 5).map((city, i) => (
+                  <View key={i} style={styles.cityBadge}>
+                    <Text style={styles.cityBadgeText}>{city}</Text>
+                  </View>
+                ))}
+                {lastEventCities.length > 5 && (
+                  <View style={styles.cityBadge}>
+                    <Text style={styles.cityBadgeText}>+{lastEventCities.length - 5}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
         ) : (
+          /* True calm — no history at all */
           <View style={styles.calmHero}>
             <View style={styles.heroIconWrapCalm}>
               <Text style={styles.heroIconCalm}>🌿</Text>
@@ -180,6 +233,14 @@ function makeStyles(c: AppColors) {
     heroIconCalm: { fontSize: 40 },
     calmTitle: { fontSize: 30, fontWeight: '800', color: '#fff', marginBottom: 6 },
     calmSubtitle: { fontSize: 16, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
+    lastEventLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+      marginBottom: 4,
+      color: 'rgba(255,255,255,0.7)',
+    },
     alertHero: {
       borderRadius: 16,
       padding: 20,
