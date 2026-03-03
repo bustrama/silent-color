@@ -15,22 +15,26 @@ interface MapMarker {
 }
 
 function buildRecentMarkers(
-  displayedItems: { alertDate: string; data: string }[]
+  allItems: { alertDate: string; data: string }[]
 ): MapMarker[] {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000; // last 24 hours
   const seen = new Set<string>();
   const result: MapMarker[] = [];
 
-  for (const item of displayedItems.slice(0, 30)) {
+  for (const item of allItems) {
     const d = new Date(item.alertDate);
-    if (isNaN(d.getTime()) || d.getTime() < cutoff) continue;
-    const cityName = item.data.trim();
-    if (!cityName || seen.has(cityName)) continue;
-    const coords = getCityCoords(cityName);
-    if (!coords) continue;
-    seen.add(cityName);
-    result.push({ city: cityName, lat: coords.lat, lon: coords.lon });
-    if (result.length >= 20) break;
+    if (isNaN(d.getTime()) || d.getTime() < cutoff) break; // history is newest-first
+
+    // data may be a single city or comma-separated list
+    const cities = item.data.split(',').map((s) => s.trim()).filter(Boolean);
+    for (const cityName of cities) {
+      if (seen.has(cityName)) continue;
+      const coords = getCityCoords(cityName);
+      if (!coords) continue;
+      seen.add(cityName);
+      result.push({ city: cityName, lat: coords.lat, lon: coords.lon });
+    }
+    if (result.length >= 150) break; // cap at 150 unique markers
   }
   return result;
 }
@@ -153,15 +157,15 @@ function buildMapHTML(
 export default function MapScreen() {
   const webviewRef = useRef<WebView>(null);
   const { currentAlert, matchedCities } = useLiveAlertContext();
-  const { displayedItems } = useAlertHistoryContext();
+  const { allItems } = useAlertHistoryContext();
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const alertCities = matchedCities;
 
   const recentMarkers = useMemo(
-    () => buildRecentMarkers(displayedItems),
-    [displayedItems]
+    () => buildRecentMarkers(allItems),
+    [allItems]
   );
 
   const liveMarkers = useMemo(
