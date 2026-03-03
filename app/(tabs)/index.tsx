@@ -107,24 +107,29 @@ export default function HomeScreen() {
             </View>
           </View>
         ) : lastEvent ? (
-          /* Last-event hero — calm style, shows most recent alert matching filter */
+          /* Calm card + last-event footer */
           <View style={styles.calmHero}>
             <View style={styles.heroIconWrapCalm}>
-              <Text style={styles.heroIconCalm}>{lastEventIcon}</Text>
+              <Text style={styles.heroIconCalm}>🌿</Text>
             </View>
-            <Text style={styles.lastEventLabel}>האירוע האחרון</Text>
-            <Text style={styles.calmTitle}>{lastEvent.title}</Text>
-            <Text style={styles.calmSubtitle}>{lastEventTime}</Text>
+            <Text style={styles.calmTitle}>הכל רגוע</Text>
+            <Text style={styles.calmSubtitle}>אין התרעות פעילות כרגע</Text>
+
+            <View style={styles.lastEventDivider} />
+
+            <Text style={styles.lastEventRow}>
+              {lastEventIcon}{'  '}{lastEvent.title} · {lastEventTime}
+            </Text>
             {lastEventCities.length > 0 && (
               <View style={styles.citiesWrap}>
-                {lastEventCities.slice(0, 5).map((city, i) => (
+                {lastEventCities.slice(0, 4).map((city, i) => (
                   <View key={i} style={styles.cityBadge}>
                     <Text style={styles.cityBadgeText}>{city}</Text>
                   </View>
                 ))}
-                {lastEventCities.length > 5 && (
+                {lastEventCities.length > 4 && (
                   <View style={styles.cityBadge}>
-                    <Text style={styles.cityBadgeText}>+{lastEventCities.length - 5}</Text>
+                    <Text style={styles.cityBadgeText}>+{lastEventCities.length - 4}</Text>
                   </View>
                 )}
               </View>
@@ -233,13 +238,18 @@ function makeStyles(c: AppColors) {
     heroIconCalm: { fontSize: 40 },
     calmTitle: { fontSize: 30, fontWeight: '800', color: '#fff', marginBottom: 6 },
     calmSubtitle: { fontSize: 16, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
-    lastEventLabel: {
-      fontSize: 11,
-      fontWeight: '700',
-      letterSpacing: 0.8,
-      textTransform: 'uppercase',
-      marginBottom: 4,
-      color: 'rgba(255,255,255,0.7)',
+    lastEventDivider: {
+      width: '75%',
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: 'rgba(255,255,255,0.3)',
+      marginVertical: 14,
+    },
+    lastEventRow: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: 'rgba(255,255,255,0.9)',
+      textAlign: 'center',
+      marginBottom: 10,
     },
     alertHero: {
       borderRadius: 16,
