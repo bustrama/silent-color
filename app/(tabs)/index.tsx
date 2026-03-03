@@ -4,9 +4,11 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useLiveAlertContext } from '../../src/context/LiveAlertContext';
@@ -17,6 +19,43 @@ import { useTheme } from '../../src/hooks/useTheme';
 import type { AppColors } from '../../src/hooks/useTheme';
 import { matchesCityFilter, matchesSingleCity } from '../../src/utils/cityFilter';
 import { getAlertIcon } from '../../src/utils/alertIcon';
+import { getAlertColors } from '../../src/utils/alertColors';
+import { getCityCoords } from '../../src/data/cityCoordinates';
+
+function buildMiniMapHTML(
+  markers: Array<{ lat: number; lon: number; color: string }>,
+  isDark: boolean,
+): string {
+  const markersJson = JSON.stringify(markers);
+  const tileUrl = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  return `<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body,#map{height:100%;width:100%}
+    body{background:${isDark ? '#0f172a' : '#e8f4f8'}}
+    .leaflet-control-attribution{display:none!important}
+  </style>
+</head><body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  var map=L.map('map',{zoomControl:false,dragging:false,scrollWheelZoom:false,
+    touchZoom:false,doubleClickZoom:false,keyboard:false,attributionControl:false})
+    .setView([31.5,35.0],7);
+  L.tileLayer('${tileUrl}',{maxZoom:19,subdomains:'abcd'}).addTo(map);
+  ${markersJson}.forEach(function(m){
+    L.circleMarker([m.lat,m.lon],{radius:5,color:m.color,fillColor:m.color,
+      fillOpacity:0.75,weight:1.5}).addTo(map);
+  });
+</script>
+</body></html>`;
+}
 
 function formatRelativeTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -34,7 +73,7 @@ export default function HomeScreen() {
   const { currentAlert, matchedCities } = useLiveAlertContext();
   const { allItems, displayedItems, loading } = useAlertHistoryContext();
   const { prefs } = usePreferencesContext();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const showAlert = currentAlert !== null && matchedCities.length > 0;
@@ -60,6 +99,33 @@ export default function HomeScreen() {
     ? getAlertIcon(lastEvent.title, lastEvent.category)
     : null;
   const lastEventTime = lastEvent ? formatRelativeTime(lastEvent.alertDate) : '';
+  // Mini map markers — last 24h, up to 60 unique cities, colored by alert type
+  const miniMapMarkers = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const seen = new Set<string>();
+    const result: Array<{ lat: number; lon: number; color: string }> = [];
+    for (const item of allItems) {
+      const d = new Date(item.alertDate);
+      if (isNaN(d.getTime()) || d.getTime() < cutoff) break;
+      const { primary } = getAlertColors(item.title, item.category);
+      const cities = item.data.split(',').map((s) => s.trim()).filter(Boolean);
+      for (const city of cities) {
+        if (seen.has(city)) continue;
+        const coords = getCityCoords(city);
+        if (!coords) continue;
+        seen.add(city);
+        result.push({ lat: coords.lat, lon: coords.lon, color: primary });
+        if (result.length >= 60) return result;
+      }
+    }
+    return result;
+  }, [allItems]);
+
+  const miniMapHtml = useMemo(
+    () => buildMiniMapHTML(miniMapMarkers, isDark),
+    [miniMapMarkers, isDark],
+  );
+
   const lastEventCities = useMemo(() => {
     if (!lastEvent) return [];
     const all = lastEvent.data.split(',').map((s) => s.trim()).filter(Boolean);
@@ -172,24 +238,35 @@ export default function HomeScreen() {
         )}
 
         {/* Map preview card */}
-        <TouchableOpacity
-          style={styles.mapCard}
-          onPress={() => router.push('/(tabs)/map')}
-          activeOpacity={0.85}
-        >
-          <View style={styles.mapCardBg}>
-            <View style={styles.mapCardOverlay}>
-              <View style={styles.realtimeBadge}>
-                <View style={styles.realtimeDot} />
-                <Text style={styles.realtimeText}>בזמן אמת</Text>
-              </View>
-              <View style={styles.mapCardBottom}>
-                <Text style={styles.mapCardTitle}>מפת התרעות</Text>
-                <Text style={styles.mapCardSub}>לחץ לצפייה במפה המלאה בזמן אמת</Text>
-              </View>
+        <View style={styles.mapCard}>
+          {/* Real mini-map — non-interactive, purely visual */}
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <WebView
+              source={{ html: miniMapHtml }}
+              style={{ flex: 1 }}
+              scrollEnabled={false}
+              javaScriptEnabled
+              originWhitelist={['*']}
+              mixedContentMode="always"
+            />
+          </View>
+          {/* Dark overlay with text */}
+          <View style={styles.mapCardOverlay} pointerEvents="none">
+            <View style={styles.realtimeBadge}>
+              <View style={styles.realtimeDot} />
+              <Text style={styles.realtimeText}>בזמן אמת</Text>
+            </View>
+            <View style={styles.mapCardBottom}>
+              <Text style={styles.mapCardTitle}>מפת התרעות</Text>
+              <Text style={styles.mapCardSub}>לחץ לצפייה במפה המלאה בזמן אמת</Text>
             </View>
           </View>
-        </TouchableOpacity>
+          {/* Transparent pressable on top — captures taps without interfering with WebView rendering */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => router.push('/(tabs)/map')}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -331,10 +408,10 @@ function makeStyles(c: AppColors) {
       shadowRadius: 8,
       elevation: 4,
     },
-    mapCardBg: { flex: 1, backgroundColor: c.mapCardBg },
     mapCardOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(15,23,42,0.5)',
+      position: 'absolute',
+      top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(15,23,42,0.45)',
       padding: 14,
       justifyContent: 'flex-end',
     },
