@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,8 @@ export default function SettingsScreen() {
   } = usePreferencesContext();
 
   const [search, setSearch] = useState('');
+  const [customInput, setCustomInput] = useState('');
+  const customInputRef = useRef<TextInput>(null);
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -55,6 +57,16 @@ export default function SettingsScreen() {
 
   const selectedCount = prefs.selectedCities.length;
   const allLabels = cities.map((c) => c.label);
+
+  const handleAddCustom = useCallback(() => {
+    const name = customInput.trim();
+    if (!name) return;
+    if (!prefs.selectedCities.includes(name)) {
+      toggleCity(name);
+    }
+    setCustomInput('');
+    customInputRef.current?.blur();
+  }, [customInput, prefs.selectedCities, toggleCity]);
 
   const handleTestSound = useCallback(async () => {
     await playAlertSound('sound', prefs.customSoundUri);
@@ -90,6 +102,155 @@ export default function SettingsScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
+      {!search && (
+        <>
+          {/* 1. Sound settings */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>קול התראה</Text>
+            <View style={styles.soundRow}>
+              {SOUND_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.soundChip,
+                    prefs.soundSetting === opt.value && styles.soundChipActive,
+                  ]}
+                  onPress={() => setSoundSetting(opt.value)}
+                >
+                  <Text style={styles.soundChipIcon}>{opt.icon}</Text>
+                  <Text
+                    style={[
+                      styles.soundChipLabel,
+                      prefs.soundSetting === opt.value && styles.soundChipLabelActive,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Expanded sound controls — only when sound mode is selected */}
+            {prefs.soundSetting === 'sound' && (
+              <View style={styles.soundExpanded}>
+                <View style={styles.soundFileRow}>
+                  <Text style={styles.soundFileIcon}>🎵</Text>
+                  <Text style={styles.soundFileName} numberOfLines={1}>
+                    {soundFileName}
+                  </Text>
+                  {prefs.customSoundUri && (
+                    <TouchableOpacity onPress={handleResetSound} style={styles.soundResetBtn}>
+                      <Text style={styles.soundResetText}>איפוס</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={styles.soundActionRow}>
+                  <TouchableOpacity
+                    style={styles.soundActionBtn}
+                    onPress={handleTestSound}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.soundActionIcon}>🔊</Text>
+                    <Text style={styles.soundActionLabel}>בדוק צליל</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.soundActionBtn, styles.soundActionBtnPrimary]}
+                    onPress={handlePickSound}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.soundActionIcon}>📁</Text>
+                    <Text style={[styles.soundActionLabel, styles.soundActionLabelPrimary]}>
+                      בחר מהמכשיר
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* 2. Selected city badges */}
+          {selectedCount > 0 && (
+            <View style={styles.badgesSection}>
+              <Text style={styles.badgesSectionLabel}>
+                {selectedCount} ישובים נבחרו
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.badgesScroll}
+              >
+                {prefs.selectedCities.map((cityLabel) => (
+                  <TouchableOpacity
+                    key={cityLabel}
+                    style={styles.badge}
+                    onPress={() => toggleCity(cityLabel)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.badgeText}>{cityLabel}</Text>
+                    <Text style={styles.badgeX}>✕</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* 3. Filter settings — exact match toggle */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>הגדרות סינון</Text>
+            <View style={styles.exactMatchRow}>
+              <Switch
+                value={prefs.exactCityMatch ?? false}
+                onValueChange={setExactCityMatch}
+                trackColor={{ false: colors.border, true: `${colors.primaryDark}80` }}
+                thumbColor={prefs.exactCityMatch ? colors.primaryDark : colors.textMuted}
+              />
+              <View style={styles.exactMatchTexts}>
+                <Text style={styles.exactMatchTitle}>התאמה מדויקת</Text>
+                <Text style={styles.exactMatchDesc}>
+                  {prefs.exactCityMatch
+                    ? 'מציג רק התרעות שהישוב שלהם תואם בדיוק'
+                    : 'מציג גם התרעות עם שמות דומים'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* 4. Custom city input */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>הוסף ישוב ידנית</Text>
+            <View style={styles.customRow}>
+              <TouchableOpacity
+                style={[
+                  styles.addBtn,
+                  !customInput.trim() && styles.addBtnDisabled,
+                ]}
+                onPress={handleAddCustom}
+                disabled={!customInput.trim()}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.addBtnText,
+                  !customInput.trim() && styles.addBtnTextDisabled,
+                ]}>
+                  + הוסף
+                </Text>
+              </TouchableOpacity>
+              <TextInput
+                ref={customInputRef}
+                style={styles.customTextInput}
+                placeholder="שם ישוב שלא ברשימה..."
+                placeholderTextColor={colors.textMuted}
+                value={customInput}
+                onChangeText={setCustomInput}
+                textAlign="right"
+                returnKeyType="done"
+                onSubmitEditing={handleAddCustom}
+              />
+            </View>
+          </View>
+        </>
+      )}
+
       <FlatList
         data={filteredCities}
         keyExtractor={(item) => item.label}
@@ -104,33 +265,7 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View>
-            {/* Selected city badges */}
-            {selectedCount > 0 && !search && (
-              <View style={styles.badgesSection}>
-                <Text style={styles.badgesSectionLabel}>
-                  {selectedCount} ישובים נבחרו
-                </Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.badgesScroll}
-                >
-                  {prefs.selectedCities.map((cityLabel) => (
-                    <TouchableOpacity
-                      key={cityLabel}
-                      style={styles.badge}
-                      onPress={() => toggleCity(cityLabel)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.badgeText}>{cityLabel}</Text>
-                      <Text style={styles.badgeX}>✕</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {/* Search */}
+            {/* 5. Search — sits right above the city list */}
             <View style={styles.searchWrap}>
               <View style={styles.searchBar}>
                 <Text style={styles.searchIcon}>🔍</Text>
@@ -143,115 +278,33 @@ export default function SettingsScreen() {
                   textAlign="right"
                   returnKeyType="search"
                 />
+                {search.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setSearch('')}
+                    style={styles.searchClearBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.searchClearText}>✕</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
-            {/* Filter settings — exact match toggle */}
-            {!search && (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>הגדרות סינון</Text>
-                <View style={styles.exactMatchRow}>
-                  <Switch
-                    value={prefs.exactCityMatch ?? false}
-                    onValueChange={setExactCityMatch}
-                    trackColor={{ false: colors.border, true: `${colors.primaryDark}80` }}
-                    thumbColor={prefs.exactCityMatch ? colors.primaryDark : colors.textMuted}
-                  />
-                  <View style={styles.exactMatchTexts}>
-                    <Text style={styles.exactMatchTitle}>התאמה מדויקת</Text>
-                    <Text style={styles.exactMatchDesc}>
-                      {prefs.exactCityMatch
-                        ? 'מציג רק התרעות שהישוב שלהם תואם בדיוק'
-                        : 'מציג גם התרעות עם שמות דומים'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Sound settings */}
-            {!search && (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>קול התראה</Text>
-                <View style={styles.soundRow}>
-                  {SOUND_OPTIONS.map((opt) => (
-                    <TouchableOpacity
-                      key={opt.value}
-                      style={[
-                        styles.soundChip,
-                        prefs.soundSetting === opt.value &&
-                          styles.soundChipActive,
-                      ]}
-                      onPress={() => setSoundSetting(opt.value)}
-                    >
-                      <Text style={styles.soundChipIcon}>{opt.icon}</Text>
-                      <Text
-                        style={[
-                          styles.soundChipLabel,
-                          prefs.soundSetting === opt.value &&
-                            styles.soundChipLabelActive,
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Expanded sound controls — only when sound mode is selected */}
-                {prefs.soundSetting === 'sound' && (
-                  <View style={styles.soundExpanded}>
-                    {/* Current sound name */}
-                    <View style={styles.soundFileRow}>
-                      <Text style={styles.soundFileIcon}>🎵</Text>
-                      <Text style={styles.soundFileName} numberOfLines={1}>
-                        {soundFileName}
-                      </Text>
-                      {prefs.customSoundUri && (
-                        <TouchableOpacity onPress={handleResetSound} style={styles.soundResetBtn}>
-                          <Text style={styles.soundResetText}>איפוס</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    {/* Action buttons */}
-                    <View style={styles.soundActionRow}>
-                      <TouchableOpacity
-                        style={styles.soundActionBtn}
-                        onPress={handleTestSound}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.soundActionIcon}>🔊</Text>
-                        <Text style={styles.soundActionLabel}>בדוק צליל</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.soundActionBtn, styles.soundActionBtnPrimary]}
-                        onPress={handlePickSound}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.soundActionIcon}>📁</Text>
-                        <Text style={[styles.soundActionLabel, styles.soundActionLabelPrimary]}>
-                          בחר מהמכשיר
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* City list header */}
+            {/* City list header — RTL: title+clear on right, select-all on left */}
             <View style={styles.cityListHeader}>
-              <TouchableOpacity onPress={() => selectAllCities(allLabels)}>
-                <Text style={styles.selectAllBtn}>בחר הכל</Text>
-              </TouchableOpacity>
+              {/* Right side: section title + clear button */}
               <View style={styles.cityListTitleRow}>
+                <Text style={styles.cityListLabel}>כל היישובים</Text>
                 {selectedCount > 0 && (
                   <TouchableOpacity onPress={clearCities}>
                     <Text style={styles.clearBtn}>נקה ({selectedCount})</Text>
                   </TouchableOpacity>
                 )}
-                <Text style={styles.sectionLabel}>כל היישובים</Text>
               </View>
+              {/* Left side: select all */}
+              <TouchableOpacity onPress={() => selectAllCities(allLabels)}>
+                <Text style={styles.selectAllBtn}>בחר הכל</Text>
+              </TouchableOpacity>
             </View>
 
             {citiesLoading && (
@@ -294,8 +347,7 @@ function makeStyles(c: AppColors) {
     // Selected badges
     badgesSection: {
       paddingHorizontal: 16,
-      paddingTop: 14,
-      paddingBottom: 4,
+      paddingBottom: 16,
     },
     badgesSectionLabel: {
       fontSize: 11,
@@ -330,7 +382,7 @@ function makeStyles(c: AppColors) {
       color: c.primaryDark,
       fontWeight: '700',
     },
-    searchWrap: { padding: 16, paddingBottom: 8 },
+    searchWrap: { paddingHorizontal: 16, paddingBottom: 8, paddingTop: 4 },
     searchBar: {
       flexDirection: 'row-reverse',
       alignItems: 'center',
@@ -344,6 +396,14 @@ function makeStyles(c: AppColors) {
     },
     searchIcon: { fontSize: 16 },
     searchInput: { flex: 1, color: c.textMain, fontSize: 15 },
+    searchClearBtn: {
+      paddingLeft: 8,
+    },
+    searchClearText: {
+      fontSize: 14,
+      color: c.textMuted,
+      fontWeight: '600',
+    },
     section: {
       marginHorizontal: 16,
       marginBottom: 16,
@@ -356,6 +416,41 @@ function makeStyles(c: AppColors) {
       marginBottom: 10,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
+    },
+    // Custom city input
+    customRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.surfaceLight,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: c.border,
+      overflow: 'hidden',
+    },
+    customTextInput: {
+      flex: 1,
+      color: c.textMain,
+      fontSize: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+    },
+    addBtn: {
+      backgroundColor: c.primaryDark,
+      paddingHorizontal: 16,
+      paddingVertical: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addBtnDisabled: {
+      backgroundColor: `${c.primaryDark}40`,
+    },
+    addBtnText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#fff',
+    },
+    addBtnTextDisabled: {
+      color: 'rgba(255,255,255,0.5)',
     },
     soundRow: {
       flexDirection: 'row-reverse',
@@ -447,17 +542,26 @@ function makeStyles(c: AppColors) {
       fontWeight: '600',
     },
     soundActionLabelPrimary: { color: c.primaryDark },
+    // City list header — RTL layout
     cityListHeader: {
-      flexDirection: 'row',
+      flexDirection: 'row-reverse',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingBottom: 8,
     },
     cityListTitleRow: {
-      flexDirection: 'row',
+      flexDirection: 'row-reverse',
       alignItems: 'center',
-      gap: 10,
+      gap: 8,
+    },
+    // Label without bottom margin for inline use in the list header row
+    cityListLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: c.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
     selectAllBtn: {
       fontSize: 13,
