@@ -14,12 +14,18 @@ export function useLiveAlerts(
   selectedCities: string[],
   soundSetting: SoundSetting,
   exactCityMatch: boolean,
+  customSoundUri: string | undefined,
+  alertVolume: number,
+  mutedAlertCategories: number[] = [],
 ) {
   const [currentAlert, setCurrentAlert] = useState<OrefAlert | null>(null);
   const [matchedCities, setMatchedCities] = useState<string[]>([]);
   const soundSettingRef = useRef(soundSetting);
   const selectedCitiesRef = useRef(selectedCities);
   const exactCityMatchRef = useRef(exactCityMatch);
+  const customSoundUriRef = useRef(customSoundUri);
+  const alertVolumeRef = useRef(alertVolume);
+  const mutedCategoriesRef = useRef(mutedAlertCategories);
 
   // Keep refs in sync so interval closure has latest values
   useEffect(() => {
@@ -33,6 +39,18 @@ export function useLiveAlerts(
   useEffect(() => {
     exactCityMatchRef.current = exactCityMatch;
   }, [exactCityMatch]);
+
+  useEffect(() => {
+    customSoundUriRef.current = customSoundUri;
+  }, [customSoundUri]);
+
+  useEffect(() => {
+    alertVolumeRef.current = alertVolume;
+  }, [alertVolume]);
+
+  useEffect(() => {
+    mutedCategoriesRef.current = mutedAlertCategories;
+  }, [mutedAlertCategories]);
 
   // Pre-seed the deduplication set from storage to prevent re-firing
   // the last alert after a cold start (foreground/background sync)
@@ -68,13 +86,23 @@ export function useLiveAlerts(
 
       // Only notify/sound for genuinely new alerts
       if (isNewAlert(alert)) {
+        // Skip sound/notification if this alert category is muted
+        const catId = parseInt(alert.cat, 10);
+        const isCategoryMuted =
+          !isNaN(catId) && mutedCategoriesRef.current.includes(catId);
+
         const alertKey = `${alert.id}-${alert.data.join(',')}`;
         await saveLastAlertId(alertKey);
 
-        const shouldNotify = cities.length === 0 || matched.length > 0;
+        const shouldNotify =
+          !isCategoryMuted && (cities.length === 0 || matched.length > 0);
         if (shouldNotify) {
           await scheduleAlertNotification(alert, matched);
-          await playAlertSound(soundSettingRef.current);
+          await playAlertSound(
+            soundSettingRef.current,
+            customSoundUriRef.current,
+            alertVolumeRef.current,
+          );
         }
       }
     }

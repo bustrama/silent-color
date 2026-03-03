@@ -26,12 +26,23 @@ if (Notifications) {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
-      shouldPlaySound: false, // we handle sound manually via expo-audio
+      shouldPlaySound: false, // we handle sound manually via expo-audio (respects our volume)
       shouldSetBadge: true,
       shouldShowBanner: true,
       shouldShowList: true,
     }),
   });
+
+  // Android: create a high-priority channel with custom alert sound
+  if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync('red-alerts', {
+      name: 'התרעות אדומות',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: 'alert.wav',
+      vibrationPattern: [0, 300, 200, 300],
+      lightColor: '#FF0000',
+    }).catch(() => {});
+  }
 }
 
 export async function requestNotificationPermissions(): Promise<boolean> {
@@ -58,9 +69,12 @@ export async function scheduleAlertNotification(
     content: {
       title: alert.title,
       body,
-      sound: false, // handled by expo-audio
+      // 'alert.wav' plays via OS when app is backgrounded; foreground sound handled by expo-audio
+      sound: 'alert.wav',
       priority: Notifications.AndroidNotificationPriority.MAX,
       color: '#FF0000',
+      // Android: route to our high-priority channel with correct sound
+      channelId: 'red-alerts',
     },
     trigger: null, // fire immediately
   });
@@ -70,7 +84,8 @@ let audioPlayer: AudioPlayer | null = null;
 
 export async function playAlertSound(
   setting: SoundSetting,
-  customSoundUri?: string
+  customSoundUri?: string,
+  volume = 1.0
 ): Promise<void> {
   if (setting === 'silent') return;
 
@@ -92,6 +107,8 @@ export async function playAlertSound(
       : require('../../assets/sounds/alert.wav');
 
     audioPlayer = createAudioPlayer(source);
+    // Apply volume (0.0–1.0) — overrides phone media/silent volume via playsInSilentMode
+    audioPlayer.volume = Math.min(1, Math.max(0, volume));
     audioPlayer.play();
 
     // Also vibrate alongside sound

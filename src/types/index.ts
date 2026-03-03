@@ -34,4 +34,11 @@ export interface UserPreferences {
   exactCityMatch?: boolean;
   /** True once the user has completed or dismissed the first-run onboarding */
   onboardingDone?: boolean;
+  /** Alert sound volume, 0.0 – 1.0 (default 1.0 = full volume) */
+  alertVolume?: number;
+  /**
+   * Category IDs that are muted (no sound or notification).
+   * An empty array (or undefined) means all categories are active.
+   */
+  mutedAlertCategories?: number[];
 }

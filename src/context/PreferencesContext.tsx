@@ -12,6 +12,8 @@ interface PreferencesContextValue {
   setCustomSound: (uri: string | null, name: string | null) => void;
   setExactCityMatch: (exact: boolean) => void;
   setOnboardingDone: () => void;
+  setAlertVolume: (volume: number) => void;
+  toggleAlertCategory: (catId: number) => void;
 }
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);

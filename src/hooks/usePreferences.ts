@@ -84,6 +84,31 @@ export function usePreferences() {
     });
   }, []);
 
+  const setAlertVolume = useCallback((volume: number) => {
+    const clamped = Math.min(1, Math.max(0, volume));
+    setPrefs(prev => {
+      const updated: UserPreferences = { ...prev, alertVolume: clamped };
+      savePreferences(updated);
+      return updated;
+    });
+  }, []);
+
+  /**
+   * Toggle a category ID in/out of the muted set.
+   * If the ID is already muted, it becomes active and vice versa.
+   */
+  const toggleAlertCategory = useCallback((catId: number) => {
+    setPrefs(prev => {
+      const current = prev.mutedAlertCategories ?? [];
+      const next = current.includes(catId)
+        ? current.filter((id) => id !== catId)
+        : [...current, catId];
+      const updated: UserPreferences = { ...prev, mutedAlertCategories: next };
+      savePreferences(updated);
+      return updated;
+    });
+  }, []);
+
   return {
     prefs,
     loading,
@@ -94,5 +119,7 @@ export function usePreferences() {
     setCustomSound,
     setExactCityMatch,
     setOnboardingDone,
+    setAlertVolume,
+    toggleAlertCategory,
   };
 }

@@ -10,6 +10,7 @@ import {
   getLastAlertId,
   saveLastAlertId,
 } from '../services/storageService';
+import { matchesSingleCity } from '../utils/cityFilter';
 
 export const BACKGROUND_FETCH_TASK = 'RED_ALERT_BACKGROUND_FETCH';
 
@@ -27,17 +28,33 @@ TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
     await saveLastAlertId(alertKey);
 
     const prefs = await getPreferences();
+
+    // Use the same normalization logic as the foreground hook to avoid
+    // missing alerts due to Hebrew name variants (e.g. "תל אביב - יפו" vs "תל אביב-יפו")
     const matchedCities =
       prefs.selectedCities.length > 0
-        ? alert.data.filter((city) => prefs.selectedCities.includes(city))
+        ? alert.data.filter((city) =>
+            matchesSingleCity(city, prefs.selectedCities, prefs.exactCityMatch ?? false)
+          )
         : alert.data;
 
     if (prefs.selectedCities.length > 0 && matchedCities.length === 0) {
       return BackgroundTask.BackgroundTaskResult.Success;
     }
 
+    // Skip sound/notification if this alert category is muted
+    const catId = parseInt(alert.cat, 10);
+    const mutedCategories = prefs.mutedAlertCategories ?? [];
+    if (!isNaN(catId) && mutedCategories.includes(catId)) {
+      return BackgroundTask.BackgroundTaskResult.Success;
+    }
+
     await scheduleAlertNotification(alert, matchedCities);
-    await playAlertSound(prefs.soundSetting);
+    await playAlertSound(
+      prefs.soundSetting,
+      prefs.customSoundUri,
+      prefs.alertVolume ?? 1.0
+    );
 
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch {
