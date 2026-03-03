@@ -11,16 +11,6 @@
       "resizeMode": "contain",
       "backgroundColor": "#1a1a1a"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.yourname.redalert",
-      "infoPlist": {
-        "UIBackgroundModes": [
-          "fetch",
-          "remote-notification"
-        ]
-      }
-    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#1a1a1a",
@@ -29,7 +19,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.yourname.redalert",
+      "package": "com.bustrama.redalert",
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
