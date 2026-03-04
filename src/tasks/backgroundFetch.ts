@@ -1,5 +1,6 @@
 import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
+import { setAudioModeAsync } from 'expo-audio';
 import { fetchLiveAlerts } from '../services/alertService';
 import {
   scheduleAlertNotification,
@@ -50,6 +51,10 @@ TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
     }
 
     await scheduleAlertNotification(alert, matchedCities);
+
+    // Configure audio session in the background JS runtime — _layout.tsx only sets
+    // this in the foreground runtime, so the background context needs its own call.
+    await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true }).catch(() => {});
     await playAlertSound(
       prefs.soundSetting,
       prefs.customSoundUri,

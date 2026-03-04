@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { I18nManager, useColorScheme } from 'react-native';
+import { Alert, Linking, Platform, I18nManager, useColorScheme } from 'react-native';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -7,6 +7,7 @@ import { setAudioModeAsync } from 'expo-audio';
 import Constants from 'expo-constants';
 import { requestNotificationPermissions } from '../src/services/notificationService';
 import { registerBackgroundFetch } from '../src/tasks/backgroundFetch';
+import { getBatteryPromptShown, setBatteryPromptShown } from '../src/services/storageService';
 import { PreferencesProvider } from '../src/context/PreferencesContext';
 import { LiveAlertProvider } from '../src/context/LiveAlertContext';
 import { AlertHistoryProvider } from '../src/context/AlertHistoryContext';
@@ -34,6 +35,27 @@ export default function RootLayout() {
     const isExpoGo = Constants.appOwnership === 'expo';
     if (!isExpoGo) {
       registerBackgroundFetch().catch(() => {});
+
+      // Android: prompt once to disable battery optimization so background alerts
+      // aren't killed by Doze mode. Without this exemption the OS can delay or
+      // skip the background task entirely.
+      if (Platform.OS === 'android') {
+        getBatteryPromptShown().then((shown) => {
+          if (shown) return;
+          setBatteryPromptShown().catch(() => {});
+          Alert.alert(
+            'הפעלת התרעות ברקע',
+            'כדי לקבל התרעות גם כשהאפליקציה סגורה, יש לבטל אופטימיזציית סוללה:\nהגדרות ← אפליקציות ← צבע שקט ← סוללה ← ללא הגבלות',
+            [
+              {
+                text: 'פתח הגדרות',
+                onPress: () => Linking.openSettings(),
+              },
+              { text: 'אחר כך', style: 'cancel' },
+            ]
+          );
+        }).catch(() => {});
+      }
     }
   }, []);
 

@@ -5,6 +5,7 @@ const KEYS = {
   PREFERENCES: '@red_alert/preferences',
   CITIES_CACHE: '@red_alert/cities_cache',
   LAST_ALERT_ID: '@red_alert/last_alert_id',
+  BATTERY_PROMPT_SHOWN: '@red_alert/battery_prompt_shown',
 } as const;
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -63,6 +64,23 @@ export async function getLastAlertId(): Promise<string | null> {
 export async function saveLastAlertId(id: string): Promise<void> {
   try {
     await AsyncStorage.setItem(KEYS.LAST_ALERT_ID, id);
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export async function getBatteryPromptShown(): Promise<boolean> {
+  try {
+    const val = await AsyncStorage.getItem(KEYS.BATTERY_PROMPT_SHOWN);
+    return val === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function setBatteryPromptShown(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(KEYS.BATTERY_PROMPT_SHOWN, 'true');
   } catch {
     // ignore storage failures
   }
